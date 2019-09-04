@@ -1,0 +1,142 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+#                                    PRACTICAL MACHINE LEARNING ASSIGNMENT 
+#                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+##    Yogesh Rampariya
+###   4 September, 2019
+## Introduction
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+### Data Source
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+## Loading the Dataset
+
+Download the data files from the Internet and load them into two data frames. We ended up with a training dataset and a 20 observations testing dataset that will be submitted to Coursera
+
+```{r}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(randomForest)
+library(ipred)
+training <- read.csv("training.csv")
+
+```
+
+## Cleaning Data
+Identify all column having No variation which doesnot affect outcome and doesnot participate actively in deciding final outcome
+
+```{r}
+trainnzv <- nearZeroVar(training)
+trainnzv
+
+## Remove all unwanted column
+
+newdata <- training[, - trainnzv]
+ncol(newdata)
+```
+
+# Case 1 (Remove all NA from data)
+```{r}
+any(is.na(newdata))
+newdata1 <- complete.cases(newdata)
+table(as.factor(newdata1))
+
+## Considering only active rows
+newdata2 <- na.omit(newdata)
+
+## Removing 1st and 2nd column as it doesnot affect outcome classe variable
+newdata2 <- newdata2[, -c(1,2)]
+
+nrow(newdata2)
+ncol(newdata2)
+```
+
+# Case 1 Data Partition and Model Building
+```{r}
+datapart <- createDataPartition(newdata2$classe, p = 0.75, list = FALSE)
+traindata <- newdata2[datapart,]
+testdata <- newdata2[- datapart,]
+## Decision Tree Model
+model1 <- train(classe ~ ., data = traindata, method="rpart") 
+model1
+prediction1 <- predict(model1, testdata)
+confusionMatrix(prediction1, testdata$classe)
+rpart.plot(model1$finalModel, roundint=FALSE)
+## Very low accuracy
+
+## Bagging Model
+
+bagdata <- bagging(classe ~ ., data = traindata)
+prediction2 <- predict(bagdata, testdata)
+confusionMatrix(prediction2, testdata$classe)
+## Quite Improvement but still not upto mark
+
+## Random Forrest Model
+model <- train(classe ~ ., data = traindata[, -1], method = "rf", ntree = 100)
+prediction <- predict(model, testdata[, -1])
+confusionMatrix(prediction, testdata$classe)
+## Unexpected result shows there is flow in analysis and need to consider more columns
+```
+
+# Case 2 Eliminating Unnecessary column
+
+```{r}
+removena <- sapply(newdata, function(x) mean(is.na(x))) > 0.95
+newnadata <- newdata[,removena == FALSE]
+
+ncol(newnadata)
+datana <- createDataPartition(newnadata$classe, p = 0.75, list = FALSE)
+newtraindata <- newnadata[datana, ]
+newtestdata <- newnadata[- datana,]
+
+## Decision tree Model
+## Eliminating first column as Name doesnot play any role in decisiding Outcome
+model3 <- train(classe ~ ., data = newtraindata[,-1], method = "rpart")
+prediction3 <- predict(model3, newtestdata[, -1])
+confusionMatrix(prediction3, newtestdata$classe)
+## Not Quite Accurate
+rpart.plot(model3$finalModel, roundint=FALSE)
+
+## Bagging Model
+
+bagdata1 <- bagging(classe ~ ., data = newtraindata[, -1])
+prediction4 <- predict(bagdata1, newtestdata[,-1])
+confusionMatrix(prediction4, newtestdata$classe)
+
+## Random Forrest Model
+model5 <- train(classe ~ ., data = newtraindata[, -1], method = "rf", ntree = 100)
+prediction5 <- predict(model5, newtestdata[, -1])
+confusionMatrix(prediction5, newtestdata$classe)
+
+```
+
+# Conclusion
+* Based on result obtain Random forrest Model provides best possible predicting model for Case 2.  
+* As we can we from the result, the random forest algorithem far outperforms the decision tree in terms of accuracy.   We are getting 99.99% in sample accuracy, while the decision tree gives us only nearly 50% in sample accuracy
+
+
+
+
+
+
+
+
+
+
+
+
